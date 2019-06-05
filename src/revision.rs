@@ -5,7 +5,6 @@ use crate::objects::{Commit, Id, WithId};
 use crate::repo::Repository;
 
 pub struct RevList<'a> {
-    repo: &'a Repository,
     commits: Commits<'a>,
     queue: Queue,
 }
@@ -13,20 +12,19 @@ pub struct RevList<'a> {
 impl<'a> RevList<'a> {
     pub fn new(repo: &'a Repository, args: &[String]) -> Self {
         let mut rev_list = RevList {
-            repo,
             commits: Commits(&repo.database),
             queue: Queue::default(),
         };
 
         for rev in args {
-            rev_list.set_start_point(rev);
+            rev_list.set_start_point(repo, rev);
         }
 
         rev_list
     }
 
-    fn set_start_point(&mut self, rev: &str) {
-        let id = self.repo.refs.read_ref(rev);
+    fn set_start_point(&mut self, repo: &Repository, rev: &str) {
+        let id = repo.refs.read_ref(rev);
         let opt_commit = id.and_then(|id| self.commits.load(&id));
 
         if let Some(commit) = opt_commit {
