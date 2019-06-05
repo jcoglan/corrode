@@ -1,0 +1,8 @@
+[package]
+name = "corrode"
+version = "0.1.0"
+authors = ["James Coglan <jcoglan@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+flate2 = "*"
