@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 
 use crate::db::Database;
 use crate::objects::{Commit, Id, WithId};
@@ -68,7 +68,7 @@ impl Commits<'_> {
 #[derive(Default)]
 struct Queue {
     flags: HashMap<Id, HashSet<Flag>>,
-    commits: VecDeque<WithId<Commit>>,
+    commits: BinaryHeap<WithId<Commit>>,
 }
 
 #[derive(PartialEq, Eq, Hash)]
@@ -80,12 +80,12 @@ enum Flag {
 impl Queue {
     fn push(&mut self, commit: WithId<Commit>) {
         if self.mark(&commit.id, Flag::Seen) {
-            self.commits.push_back(commit);
+            self.commits.push(commit);
         }
     }
 
     fn pop(&mut self) -> Option<WithId<Commit>> {
-        self.commits.pop_front()
+        self.commits.pop()
     }
 
     fn mark(&mut self, id: &Id, flag: Flag) -> bool {

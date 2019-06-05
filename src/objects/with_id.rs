@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::ops::Deref;
 
 use super::{Commit, Id, Object};
@@ -27,5 +28,25 @@ impl WithId<Object> {
             id: self.id,
             object: self.object.commit()?,
         })
+    }
+}
+
+impl<T: PartialEq> PartialEq for WithId<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.object.eq(&other.object)
+    }
+}
+
+impl<T: Eq> Eq for WithId<T> {}
+
+impl<T: PartialOrd> PartialOrd for WithId<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.object.partial_cmp(&other.object)
+    }
+}
+
+impl<T: Ord> Ord for WithId<T> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.object.cmp(&other.object)
     }
 }

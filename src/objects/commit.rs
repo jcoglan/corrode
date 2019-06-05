@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::error::Error;
 use std::io::{BufRead, Read};
@@ -21,6 +22,29 @@ impl Commit {
         self.headers.get(key).into_iter().flatten()
     }
 }
+
+impl Ord for Commit {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (&self.committer, &other.committer) {
+            (Some(ours), Some(theirs)) => ours.time.cmp(&theirs.time),
+            _ => Ordering::Equal,
+        }
+    }
+}
+
+impl PartialOrd for Commit {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for Commit {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == Ordering::Equal
+    }
+}
+
+impl Eq for Commit {}
 
 impl<R: BufRead> From<R> for Commit {
     fn from(mut reader: R) -> Self {
