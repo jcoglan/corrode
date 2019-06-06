@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::error::Error;
 use std::io::{BufRead, Read};
@@ -13,6 +12,8 @@ pub struct Commit {
     message: String,
 }
 
+delegate_trait!(Ord, Commit => committer);
+
 impl Commit {
     pub fn parents(&self) -> impl Iterator<Item = Id> + '_ {
         self.header("parent").map(|id| Id::from(id.as_str()))
@@ -22,29 +23,6 @@ impl Commit {
         self.headers.get(key).into_iter().flatten()
     }
 }
-
-impl Ord for Commit {
-    fn cmp(&self, other: &Self) -> Ordering {
-        match (&self.committer, &other.committer) {
-            (Some(ours), Some(theirs)) => ours.time.cmp(&theirs.time),
-            _ => Ordering::Equal,
-        }
-    }
-}
-
-impl PartialOrd for Commit {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl PartialEq for Commit {
-    fn eq(&self, other: &Self) -> bool {
-        self.cmp(other) == Ordering::Equal
-    }
-}
-
-impl Eq for Commit {}
 
 impl<R: BufRead> From<R> for Commit {
     fn from(mut reader: R) -> Self {
@@ -89,6 +67,8 @@ impl<R: BufRead> Iterator for Headers<'_, R> {
 struct Author {
     time: time::Tm,
 }
+
+delegate_trait!(Ord, Author => time);
 
 impl FromStr for Author {
     type Err = Box<dyn Error>;

@@ -4,6 +4,9 @@ use std::path::PathBuf;
 use repo::Repository;
 use revision::RevList;
 
+#[macro_use]
+mod syntax;
+
 mod db;
 mod objects;
 mod refs;
