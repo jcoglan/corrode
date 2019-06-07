@@ -1,7 +1,8 @@
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
 use crate::db::Database;
 use crate::objects::{Commit, Id, WithId};
+use crate::priority_queue::PriorityQueue;
 use crate::repo::Repository;
 
 pub struct RevList<'a> {
@@ -13,7 +14,7 @@ impl<'a> RevList<'a> {
     pub fn new(repo: &'a Repository, args: &[String]) -> Self {
         let mut rev_list = RevList {
             commits: Commits(&repo.database),
-            queue: Queue::default(),
+            queue: Queue::new(),
         };
 
         for rev in args {
@@ -46,7 +47,7 @@ impl<'a> RevList<'a> {
     }
 }
 
-impl<'a> Iterator for RevList<'a> {
+impl Iterator for RevList<'_> {
     type Item = WithId<Commit>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -65,10 +66,9 @@ impl Commits<'_> {
     }
 }
 
-#[derive(Default)]
 struct Queue {
+    commits: PriorityQueue<WithId<Commit>, Option<time::Tm>>,
     flags: HashMap<Id, HashSet<Flag>>,
-    commits: BinaryHeap<WithId<Commit>>,
 }
 
 #[derive(PartialEq, Eq, Hash)]
@@ -78,6 +78,13 @@ enum Flag {
 }
 
 impl Queue {
+    fn new() -> Self {
+        Queue {
+            commits: PriorityQueue::new(|commit: &WithId<Commit>| commit.date()),
+            flags: HashMap::new(),
+        }
+    }
+
     fn push(&mut self, commit: WithId<Commit>) {
         if self.mark(&commit.id, Flag::Seen) {
             self.commits.push(commit);

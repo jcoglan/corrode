@@ -7,8 +7,6 @@ pub struct WithId<T> {
     object: T,
 }
 
-delegate_trait!(Ord, WithId<T> => object);
-
 impl<T> WithId<T> {
     pub fn new(id: Id, object: T) -> Self {
         WithId { id, object }

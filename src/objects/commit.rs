@@ -12,11 +12,13 @@ pub struct Commit {
     message: String,
 }
 
-delegate_trait!(Ord, Commit => committer);
-
 impl Commit {
     pub fn parents(&self) -> impl Iterator<Item = Id> + '_ {
         self.header("parent").map(|id| Id::from(id.as_str()))
+    }
+
+    pub fn date(&self) -> Option<time::Tm> {
+        self.committer.as_ref().map(|author| author.time)
     }
 
     fn header(&self, key: &str) -> impl Iterator<Item = &String> {
@@ -67,8 +69,6 @@ impl<R: BufRead> Iterator for Headers<'_, R> {
 struct Author {
     time: time::Tm,
 }
-
-delegate_trait!(Ord, Author => time);
 
 impl FromStr for Author {
     type Err = Box<dyn Error>;
