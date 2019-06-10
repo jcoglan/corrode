@@ -12,6 +12,7 @@ mod with_id;
 pub enum Object {
     Commit(Commit),
     Tree(Tree),
+    TreeItem(TreeItem),
 }
 
 impl Object {
@@ -27,6 +28,18 @@ impl Object {
             Object::Tree(tree) => Some(tree),
             _ => None,
         }
+    }
+}
+
+impl From<Commit> for Object {
+    fn from(commit: Commit) -> Self {
+        Object::Commit(commit)
+    }
+}
+
+impl From<TreeItem> for Object {
+    fn from(tree_item: TreeItem) -> Self {
+        Object::TreeItem(tree_item)
     }
 }
 

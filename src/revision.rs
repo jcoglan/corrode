@@ -1,20 +1,22 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::db::Database;
-use crate::objects::{Commit, Id, WithId};
+use crate::objects::{Commit, Id, Object, TreeItem, WithId};
 use crate::priority_queue::PriorityQueue;
 use crate::repo::Repository;
 
 pub struct RevList<'a> {
-    commits: Commits<'a>,
+    db: Db<'a>,
     queue: Queue,
+    pending: VecDeque<TreeItem>,
 }
 
 impl<'a> RevList<'a> {
     pub fn new(repo: &'a Repository, args: &[String]) -> Self {
         let mut rev_list = RevList {
-            commits: Commits(&repo.database),
+            db: Db(&repo.database),
             queue: Queue::new(),
+            pending: VecDeque::new(),
         };
 
         for rev in args {
@@ -26,7 +28,7 @@ impl<'a> RevList<'a> {
 
     fn set_start_point(&mut self, repo: &Repository, rev: &str) {
         let id = repo.refs.read_ref(rev);
-        let opt_commit = id.and_then(|id| self.commits.load(&id));
+        let opt_commit = id.and_then(|id| self.db.load_commit(&id));
 
         if let Some(commit) = opt_commit {
             self.queue.push(commit);
@@ -38,31 +40,62 @@ impl<'a> RevList<'a> {
             return;
         }
 
-        let commits = &self.commits;
-        let parents = commit.parents().filter_map(|id| commits.load(&id));
+        let db = &self.db;
+        let parents = commit.parents().filter_map(|id| db.load_commit(&id));
 
         for commit in parents {
             self.queue.push(commit);
         }
     }
-}
 
-impl Iterator for RevList<'_> {
-    type Item = WithId<Commit>;
+    fn add_tree_items(&mut self, item: &TreeItem) {
+        if !item.is_tree() {
+            return;
+        }
 
-    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(tree) = self.db.load(&item.id).and_then(|obj| obj.as_tree()) {
+            for (_name, item) in tree.items() {
+                if self.queue.mark(&item.id, Flag::Seen) {
+                    self.add_tree_items(item);
+                    self.pending.push_front(item.clone());
+                }
+            }
+        }
+    }
+
+    fn from_queue(&mut self) -> Option<WithId<Object>> {
         let commit = self.queue.pop()?;
         self.add_parents(&commit);
+        self.pending.push_back(commit.tree_item());
 
-        Some(commit)
+        Some(commit.map(|c| c.into()))
+    }
+
+    fn from_pending(&mut self) -> Option<WithId<Object>> {
+        let item = self.pending.pop_front()?;
+        self.add_tree_items(&item);
+
+        Some(WithId::new(item.id.clone(), item.into()))
     }
 }
 
-struct Commits<'a>(&'a Database);
+impl Iterator for RevList<'_> {
+    type Item = WithId<Object>;
 
-impl Commits<'_> {
-    fn load(&self, id: &Id) -> Option<WithId<Commit>> {
-        self.0.load(id).and_then(|obj| obj.as_commit())
+    fn next(&mut self) -> Option<Self::Item> {
+        self.from_queue().or_else(|| self.from_pending())
+    }
+}
+
+struct Db<'a>(&'a Database);
+
+impl Db<'_> {
+    fn load_commit(&self, id: &Id) -> Option<WithId<Commit>> {
+        self.load(id).and_then(|obj| obj.as_commit())
+    }
+
+    fn load(&self, id: &Id) -> Option<WithId<Object>> {
+        self.0.load(id)
     }
 }
 
