@@ -32,6 +32,7 @@ impl Database {
 
         let object = match &type_buf[..] {
             b"commit " => Object::Commit(reader.try_into().ok()?),
+            b"tree " => Object::Tree(reader.try_into().ok()?),
             _ => return None,
         };
 

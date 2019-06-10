@@ -5,10 +5,12 @@ use std::io::{BufRead, BufReader, Read};
 use std::str::FromStr;
 
 use super::read::read_to_string_until;
+use super::tree::TreeItem;
 use super::Id;
 
 #[derive(Default)]
 pub struct Commit {
+    pub tree: Id,
     parents: Vec<Id>,
     committer: Option<Author>,
     message: String,
@@ -22,6 +24,10 @@ impl Commit {
     pub fn date(&self) -> Option<time::Tm> {
         self.committer.as_ref().map(|author| author.time)
     }
+
+    pub fn tree_item(&self) -> TreeItem {
+        TreeItem::tree(&self.tree.clone())
+    }
 }
 
 impl<T: Read> TryFrom<BufReader<T>> for Commit {
@@ -31,6 +37,7 @@ impl<T: Read> TryFrom<BufReader<T>> for Commit {
         let mut commit = Commit::default();
         let headers = Headers::from(&mut reader);
 
+        commit.tree = headers.get_one("tree").unwrap().as_str().into();
         commit.committer = headers.get_one("committer").and_then(|s| s.parse().ok());
 
         commit.parents = headers
