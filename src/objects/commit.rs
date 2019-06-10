@@ -1,69 +1,85 @@
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::error::Error;
-use std::io::{BufRead, Read};
+use std::io::{BufRead, BufReader, Read};
 use std::str::FromStr;
 
+use super::read::read_to_string_until;
 use super::Id;
 
 #[derive(Default)]
 pub struct Commit {
-    headers: HashMap<String, Vec<String>>,
+    parents: Vec<Id>,
     committer: Option<Author>,
     message: String,
 }
 
 impl Commit {
     pub fn parents(&self) -> impl Iterator<Item = Id> + '_ {
-        self.header("parent").map(|id| Id::from(id.as_str()))
+        self.parents.iter().cloned()
     }
 
     pub fn date(&self) -> Option<time::Tm> {
         self.committer.as_ref().map(|author| author.time)
     }
-
-    fn header(&self, key: &str) -> impl Iterator<Item = &String> {
-        self.headers.get(key).into_iter().flatten()
-    }
 }
 
-impl<R: BufRead> From<R> for Commit {
-    fn from(mut reader: R) -> Self {
+impl<T: Read> TryFrom<BufReader<T>> for Commit {
+    type Error = Box<dyn Error>;
+
+    fn try_from(mut reader: BufReader<T>) -> Result<Self, Self::Error> {
         let mut commit = Commit::default();
+        let headers = Headers::from(&mut reader);
 
-        for (key, value) in Headers(&mut reader) {
-            commit.headers.entry(key).or_default().push(value);
-        }
+        commit.committer = headers.get_one("committer").and_then(|s| s.parse().ok());
 
-        let committer = commit
-            .header("committer")
-            .next()
-            .and_then(|s| s.parse().ok());
+        commit.parents = headers
+            .get_all("parent")
+            .map(|s| s.as_str().into())
+            .collect();
 
-        commit.committer = committer;
         reader.read_to_string(&mut commit.message).ok();
-        commit
+
+        Ok(commit)
     }
 }
 
-struct Headers<'a, R>(&'a mut R);
+struct Headers(HashMap<String, Vec<String>>);
 
-impl<R: BufRead> Iterator for Headers<'_, R> {
-    type Item = (String, String);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut line = String::new();
-        self.0.read_line(&mut line).ok()?;
-
-        if line.trim().is_empty() {
-            return None;
-        }
-
-        let mut parts = line.splitn(2, ' ').map(|s| s.trim().to_string());
-        let key = parts.next()?;
-        let value = parts.next()?;
-
-        Some((key, value))
+impl Headers {
+    fn get_all(&self, key: &str) -> impl Iterator<Item = &String> {
+        self.0.get(key).into_iter().flatten()
     }
+
+    fn get_one(&self, key: &str) -> Option<&String> {
+        self.get_all(key).next()
+    }
+}
+
+impl<T: Read> From<&mut BufReader<T>> for Headers {
+    fn from(reader: &mut BufReader<T>) -> Self {
+        let mut map = HashMap::<String, Vec<String>>::new();
+
+        while let Some((key, value)) = read_header(reader) {
+            map.entry(key).or_default().push(value);
+        }
+        Headers(map)
+    }
+}
+
+fn read_header<T: Read>(reader: &mut BufReader<T>) -> Option<(String, String)> {
+    let mut line = String::new();
+    reader.read_line(&mut line).ok()?;
+
+    if line.trim().is_empty() {
+        return None;
+    }
+
+    let mut parts = line.splitn(2, ' ').map(|s| s.trim().to_string());
+    let key = parts.next()?;
+    let value = parts.next()?;
+
+    Some((key, value))
 }
 
 struct Author {
@@ -76,8 +92,8 @@ impl FromStr for Author {
     fn from_str(string: &str) -> Result<Self, Self::Err> {
         let mut bytes = string.as_bytes();
 
-        let _name = read_until(&mut bytes, b'<')?;
-        let _email = read_until(&mut bytes, b'>')?;
+        let _name = read_to_string_until(&mut bytes, b'<')?.unwrap_or_default();
+        let _email = read_to_string_until(&mut bytes, b'>')?.unwrap_or_default();
 
         let mut time_str = String::new();
         bytes.read_to_string(&mut time_str)?;
@@ -85,14 +101,4 @@ impl FromStr for Author {
 
         Ok(Author { time })
     }
-}
-
-fn read_until(bytes: &mut &[u8], sep: u8) -> Result<String, Box<dyn Error>> {
-    let mut vec = Vec::new();
-    bytes.read_until(sep, &mut vec)?;
-
-    let mut string = String::from_utf8(vec)?;
-    string.truncate(string.len() - 1);
-
-    Ok(string.trim().to_string())
 }

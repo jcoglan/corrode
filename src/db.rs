@@ -1,3 +1,4 @@
+use std::convert::TryInto;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
@@ -30,7 +31,7 @@ impl Database {
         reader.read_until(0x00, &mut size_buf).ok()?;
 
         let object = match &type_buf[..] {
-            b"commit " => Object::Commit(reader.into()),
+            b"commit " => Object::Commit(reader.try_into().ok()?),
             _ => return None,
         };
 

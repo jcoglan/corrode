@@ -2,6 +2,7 @@ pub use self::commit::Commit;
 pub use self::with_id::WithId;
 
 mod commit;
+mod read;
 mod with_id;
 
 pub enum Object {
