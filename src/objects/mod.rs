@@ -9,39 +9,11 @@ mod read;
 mod tree;
 mod with_id;
 
-pub enum Object {
-    Commit(Commit),
-    Tree(Tree),
-    TreeItem(TreeItem),
-}
-
-impl Object {
-    pub fn commit(self) -> Option<Commit> {
-        match self {
-            Object::Commit(commit) => Some(commit),
-            _ => None,
-        }
-    }
-
-    pub fn tree(self) -> Option<Tree> {
-        match self {
-            Object::Tree(tree) => Some(tree),
-            _ => None,
-        }
-    }
-}
-
-impl From<Commit> for Object {
-    fn from(commit: Commit) -> Self {
-        Object::Commit(commit)
-    }
-}
-
-impl From<TreeItem> for Object {
-    fn from(tree_item: TreeItem) -> Self {
-        Object::TreeItem(tree_item)
-    }
-}
+wrapper_enum!(Object {
+    commit -> Commit,
+    tree -> Tree,
+    tree_item -> TreeItem,
+});
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Id(String);

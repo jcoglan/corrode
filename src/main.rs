@@ -4,6 +4,9 @@ use std::path::PathBuf;
 use repo::Repository;
 use revision::RevList;
 
+#[macro_use]
+mod macros;
+
 mod db;
 mod objects;
 mod priority_queue;
