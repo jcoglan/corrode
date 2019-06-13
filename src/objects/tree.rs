@@ -13,7 +13,7 @@ pub struct Tree {
 }
 
 impl Tree {
-    pub fn items(&self) -> impl Iterator<Item = (&String, &TreeItem)> {
+    pub fn items(&self) -> impl DoubleEndedIterator<Item = (&String, &TreeItem)> {
         self.items.iter()
     }
 }

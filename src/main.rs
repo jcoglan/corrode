@@ -21,7 +21,8 @@ fn main() {
     let revs = [String::from("master")];
     let commits = RevList::new(&repo, &revs);
 
-    for commit in commits {
-        println!("{}", commit.id.as_str());
+    for (object, path) in commits {
+        let path = path.unwrap_or_default();
+        println!("{} {}", object.id.as_str(), path.display());
     }
 }

@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::path::PathBuf;
 
 use crate::db::Database;
 use crate::objects::{Commit, Id, Object, TreeItem, WithId};
@@ -9,6 +10,7 @@ pub struct RevList<'a> {
     db: Db<'a>,
     queue: Queue,
     pending: VecDeque<TreeItem>,
+    paths: HashMap<Id, PathBuf>,
 }
 
 impl<'a> RevList<'a> {
@@ -17,6 +19,7 @@ impl<'a> RevList<'a> {
             db: Db(&repo.database),
             queue: Queue::new(),
             pending: VecDeque::new(),
+            paths: HashMap::new(),
         };
 
         for rev in args {
@@ -48,15 +51,19 @@ impl<'a> RevList<'a> {
         }
     }
 
-    fn add_tree_items(&mut self, item: &TreeItem) {
+    fn add_tree_items(&mut self, item: &TreeItem, path: PathBuf) {
+        self.paths
+            .entry(item.id.clone())
+            .or_insert_with(|| path.clone());
+
         if !item.is_tree() {
             return;
         }
 
         if let Some(tree) = self.db.load(&item.id).and_then(|obj| obj.as_tree()) {
-            for (_name, item) in tree.items() {
+            for (name, item) in tree.items().rev() {
                 if self.queue.mark(&item.id, Flag::Seen) {
-                    self.add_tree_items(item);
+                    self.add_tree_items(item, path.join(name));
                     self.pending.push_front(item.clone());
                 }
             }
@@ -71,19 +78,27 @@ impl<'a> RevList<'a> {
         Some(commit.map(|c| c.into()))
     }
 
-    fn from_pending(&mut self) -> Option<WithId<Object>> {
+    fn from_pending(&mut self) -> Option<(WithId<Object>, PathBuf)> {
         let item = self.pending.pop_front()?;
-        self.add_tree_items(&item);
+        self.add_tree_items(&item, PathBuf::default());
 
-        Some(WithId::new(item.id.clone(), item.into()))
+        let object = WithId::new(item.id.clone(), item.into());
+        let path = self.paths[&object.id].clone();
+
+        Some((object, path))
     }
 }
 
 impl Iterator for RevList<'_> {
-    type Item = WithId<Object>;
+    type Item = (WithId<Object>, Option<PathBuf>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.from_queue().or_else(|| self.from_pending())
+        let commit = self.from_queue().map(|commit| (commit, None));
+
+        commit.or_else(|| {
+            self.from_pending()
+                .map(|(object, path)| (object, Some(path)))
+        })
     }
 }
 

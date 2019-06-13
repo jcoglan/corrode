@@ -65,7 +65,7 @@ impl Headers {
 
 impl<T: Read> From<&mut BufReader<T>> for Headers {
     fn from(reader: &mut BufReader<T>) -> Self {
-        let mut map = HashMap::<String, Vec<String>>::new();
+        let mut map = HashMap::<_, Vec<_>>::new();
 
         while let Some((key, value)) = read_header(reader) {
             map.entry(key).or_default().push(value);
